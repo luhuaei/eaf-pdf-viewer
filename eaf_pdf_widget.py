@@ -20,14 +20,13 @@
 
 
 from PyQt6.QtCore import Qt, QRect, QRectF, QPoint, QEvent, QTimer, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QCursor
+from PyQt6.QtGui import QFont, QCursor
 from PyQt6.QtGui import QPainter, QPalette
 from PyQt6.QtWidgets import QWidget
 from core.utils import (interactive, eval_in_emacs, message_to_emacs,
                         atomic_edit, get_emacs_var, get_emacs_vars,
-                        get_emacs_func_result, get_emacs_config_dir,
-                        get_emacs_theme_mode, get_emacs_theme_foreground,
-                        get_emacs_theme_background, get_app_dark_mode)
+                        get_emacs_func_result, get_app_dark_mode,
+                        get_emacs_theme_mode)
 import fitz
 import time
 import math
@@ -46,12 +45,12 @@ class PdfViewerWidget(QWidget):
 
     translate_double_click_word = pyqtSignal(str)
 
-    def __init__(self, url, background_color, buffer_id, synctex_info):
+    def __init__(self, url, color, buffer_id, synctex_info):
         super(PdfViewerWidget, self).__init__()
 
         self.url = url
-        self.config_dir = get_emacs_config_dir()
-        self.background_color = background_color
+        self.color = color
+
         self.buffer_id = buffer_id
         self.user_name = get_emacs_var("user-full-name")
 
@@ -68,9 +67,6 @@ class PdfViewerWidget(QWidget):
          self.pdf_default_zoom,
          self.pdf_zoom_step,
          self.pdf_scroll_ratio,
-         self.text_highlight_annot_color,
-         self.text_underline_annot_color,
-         self.inline_text_annot_color,
          self.inline_text_annot_fontsize) = get_emacs_vars([
              "eaf-marker-letters",
              "eaf-pdf-dark-mode",
@@ -78,14 +74,9 @@ class PdfViewerWidget(QWidget):
              "eaf-pdf-default-zoom",
              "eaf-pdf-zoom-step",
              "eaf-pdf-scroll-ratio",
-             "eaf-pdf-text-highlight-annot-color",
-             "eaf-pdf-text-underline-annot-color",
-             "eaf-pdf-inline-text-annot-color",
              "eaf-pdf-inline-text-annot-fontsize"])
 
         self.theme_mode = get_emacs_theme_mode()
-        self.theme_foreground_color = get_emacs_theme_foreground()
-        self.theme_background_color = get_emacs_theme_background()
 
         # Init scale and scale mode.
         self.scale = 1.0
@@ -168,7 +159,7 @@ class PdfViewerWidget(QWidget):
         # Fill app background color
         pal = self.palette()
         # pal.setColor(QPalette.Background, self.background_color)
-        pal.setColor(QPalette.ColorRole.Window, self.background_color)
+        pal.setColor(QPalette.ColorRole.Window, self.color["buffer_background"])
         self.setAutoFillBackground(True)
         self.setPalette(pal)
 
@@ -350,11 +341,11 @@ class PdfViewerWidget(QWidget):
         # Draw background.
         # change color of background if inverted mode is enable
         if self.pdf_dark_mode == "follow" or self.pdf_dark_mode == "force":
-            color = QColor(self.theme_background_color)
+            color = self.color["theme_background"]
             painter.setBrush(color)
             painter.setPen(color)
         else:
-            color = QColor(20, 20, 20, 255) if self.inverted_mode else Qt.GlobalColor.white
+            color = self.color["default_background"] if self.inverted_mode else self.color["default_inverted_background"]
             painter.setBrush(color)
             painter.setPen(color)
 
@@ -412,9 +403,9 @@ class PdfViewerWidget(QWidget):
         painter.setFont(self.font)
 
         if self.rect().width() <= render_width and not self.inverted_mode:
-            painter.setPen(inverted_color((self.theme_foreground_color), True))
+            painter.setPen(inverted_color(self.color["theme_foreground"], True))
         else:
-            painter.setPen(inverted_color((self.theme_foreground_color)))
+            painter.setPen(inverted_color(self.color["theme_foreground"]))
 
         # Update page progress
         self.update_page_progress(painter)
@@ -427,10 +418,8 @@ class PdfViewerWidget(QWidget):
                           QPoint(x+35, y+5),
                           QPoint(x+26, y+15), QPoint(x+26, y+10), QPoint(x, y+10),
                           QPoint(x, y)])
-        fill_color = QColor(236, 96, 31, 255)
-        border_color = QColor(255, 91, 15, 255)
-        painter.setBrush(fill_color)
-        painter.setPen(border_color)
+        painter.setBrush(self.color["synctex_indicator_fill"])
+        painter.setPen(self.color["synctex_indicator_border"])
         painter.drawPolygon(arrow)
         QTimer().singleShot(5000, self.synctex_info.reset)
         painter.restore()
@@ -700,9 +689,7 @@ class PdfViewerWidget(QWidget):
             new_annot = page.addTextAnnot(annot_action.annot_top_left_point,
                                           annot_action.annot_content, icon="Note")
         elif (annot_action.annot_type == fitz.PDF_ANNOT_FREE_TEXT):
-            color = QColor(self.inline_text_annot_color)
-            color_r, color_g, color_b = color.redF(), color.greenF(), color.blueF()
-            text_color = [color_r, color_g, color_b]
+            text_color = self.color.rgbfList("inline_text_annot")
             new_annot = page.add_Freetext_Annot(annot_action.annot_rect,
                                               annot_action.annot_content,
                                               fontsize=self.inline_text_annot_fontsize,
@@ -891,15 +878,13 @@ class PdfViewerWidget(QWidget):
 
             if annot_type == "highlight":
                 new_annot = page.addHighlightAnnot(quads)
-                qcolor = QColor(self.text_highlight_annot_color)
-                new_annot.setColors(stroke=qcolor.getRgbF()[0:3])
+                new_annot.setColors(stroke=self.color.rgbfList("text_highlight_annot"))
                 new_annot.update()
             elif annot_type == "strikeout":
                 new_annot = page.addStrikeoutAnnot(quads)
             elif annot_type == "underline":
                 new_annot = page.addUnderlineAnnot(quads)
-                qcolor = QColor(self.text_underline_annot_color)
-                new_annot.setColors(stroke=qcolor.getRgbF()[0:3])
+                new_annot.setColors(stroke=self.color.rgbfList("text_underline_annot"))
                 new_annot.update()
             elif annot_type == "squiggly":
                 new_annot = page.addSquigglyAnnot(quads)
@@ -950,9 +935,7 @@ class PdfViewerWidget(QWidget):
         fontname = "Arial"
         fontsize = self.inline_text_annot_fontsize
         annot_rect = self.compute_annot_rect_inline_text(point, fontsize, text)
-        color = QColor(self.inline_text_annot_color)
-        color_r, color_g, color_b = color.redF(), color.greenF(), color.blueF()
-        text_color = [color_r, color_g, color_b]
+        text_color = self.color.rgbfList("inline_text_annot")
         new_annot = page.add_Freetext_Annot(annot_rect, text,
                                           fontsize=fontsize, fontname=fontname,
                                           text_color=text_color, align = 0)
@@ -1036,7 +1019,7 @@ class PdfViewerWidget(QWidget):
         if page_index in self.select_area_annot_quad_cache_dict:
             quads = self.select_area_annot_quad_cache_dict[page_index]
             for quad in quads:
-                qp.fillRect(quad_to_qrect(quad), QColor(self.text_highlight_annot_color))
+                qp.fillRect(quad_to_qrect(quad), self.color["text_highlight_annot"])
 
         qp.restore()
         return pixmap

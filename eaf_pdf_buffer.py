@@ -19,10 +19,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from PyQt6.QtGui import QColor
 from core.buffer import Buffer
 from core.utils import (eval_in_emacs, message_to_emacs,translate_text,
-                        atomic_edit, get_emacs_vars, get_emacs_config_dir)
+                        atomic_edit, get_emacs_vars, get_emacs_var, get_emacs_config_dir,
+                        get_emacs_theme_foreground, get_emacs_theme_background)
 import fitz
 import os
 import threading
@@ -32,6 +32,7 @@ import sys
 sys.path.append(os.path.dirname(__file__))
 
 from eaf_pdf_widget import PdfViewerWidget
+from eaf_pdf_setting import Color
 
 class SynctexInfo():
     def __init__(self, info):
@@ -59,20 +60,19 @@ class SynctexInfo():
         self.pos_x = None
         self.pos_y = None
 
-
 class AppBuffer(Buffer):
     def __init__(self, buffer_id, url, arguments):
         Buffer.__init__(self, buffer_id, url, arguments, False)
 
-        (buffer_background_color, self.store_history, self.pdf_dark_mode) = get_emacs_vars([
-             "eaf-buffer-background-color",
+        (self.store_history, self.pdf_dark_mode) = get_emacs_vars([
              "eaf-pdf-store-history",
              "eaf-pdf-dark-mode"])
 
         self.delete_temp_file = arguments == "temp_pdf_file"
 
+        self.color = Color()
         self.synctex_info = SynctexInfo(arguments)
-        self.add_widget(PdfViewerWidget(url, QColor(buffer_background_color), buffer_id, self.synctex_info))
+        self.add_widget(PdfViewerWidget(url, self.color, buffer_id, self.synctex_info))
         self.buffer_widget.translate_double_click_word.connect(translate_text)
 
         # Use thread to avoid slow down open speed.

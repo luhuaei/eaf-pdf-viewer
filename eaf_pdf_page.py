@@ -27,6 +27,7 @@ from core.utils import (message_to_emacs, get_emacs_vars)
 import fitz
 
 from eaf_pdf_utils import generate_random_key, support_hit_max
+from eaf_pdf_setting import Color
 
 def set_page_crop_box(page):
     if hasattr(page, "set_cropbox"):
@@ -307,6 +308,7 @@ class PdfPage(fitz.Page):
             self._mark_search_annot_list = []
 
     def mark_jump_link_tips(self, letters):
+        color = Color()
         fontsize, = get_emacs_vars(["eaf-pdf-marker-fontsize"])
         cache_dict = {}
         if self.page.firstLink:
@@ -317,7 +319,8 @@ class PdfPage(fitz.Page):
                 link_rect = link["from"]
                 annot_rect = fitz.Rect(link_rect.top_left, link_rect.x0 + fontsize/1.2 * len(key), link_rect.y0 + fontsize)
                 annot = self.page.add_freetext_annot(annot_rect, str(key), fontsize=fontsize, fontname="Helv", \
-                                                     text_color=[0.0, 0.0, 0.0], fill_color=[255/255.0, 197/255.0, 36/255.0], \
+                                                     text_color=color.rgbfList("jump_link_text"), \
+                                                     fill_color=color.rgbfList("jump_link_fill"), \
                                                      align = 1)
                 annot.parent = self.page
                 self._mark_jump_annot_list.append(annot)
