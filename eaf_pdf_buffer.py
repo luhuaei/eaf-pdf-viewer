@@ -32,7 +32,7 @@ import sys
 sys.path.append(os.path.dirname(__file__))
 
 from eaf_pdf_widget import PdfViewerWidget
-from eaf_pdf_setting import Color
+from eaf_pdf_setting import Color, Setting
 
 class SynctexInfo():
     def __init__(self, info):
@@ -68,11 +68,12 @@ class AppBuffer(Buffer):
              "eaf-pdf-store-history",
              "eaf-pdf-dark-mode"])
 
-        self.delete_temp_file = arguments == "temp_pdf_file"
+        self.is_temp_file = arguments == "temp_pdf_file"
 
         self.color = Color()
+        self.setting = Setting()
         self.synctex_info = SynctexInfo(arguments)
-        self.add_widget(PdfViewerWidget(url, self.color, buffer_id, self.synctex_info))
+        self.add_widget(PdfViewerWidget(url, self.color, buffer_id, self.setting, self.synctex_info))
         self.buffer_widget.translate_double_click_word.connect(translate_text)
 
         # Use thread to avoid slow down open speed.
@@ -113,7 +114,7 @@ class AppBuffer(Buffer):
                     f.write("\n")
 
     def destroy_buffer(self):
-        if self.delete_temp_file:
+        if self.is_temp_file:
             if os.path.exists(self.url):
                 os.remove(self.url)
 
@@ -153,7 +154,7 @@ class AppBuffer(Buffer):
         return "{0}:{1}:{2}:{3}:{4}".format(self.buffer_widget.scroll_offset,
                                         self.buffer_widget.scale,
                                         self.buffer_widget.read_mode,
-                                        self.buffer_widget.inverted_mode,
+                                        self.setting.inverted_mode,
                                         self.buffer_widget.rotation)
 
     def restore_session_data(self, session_data):

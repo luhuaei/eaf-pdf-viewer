@@ -21,7 +21,8 @@
 from PyQt6.QtGui import QColor
 from PyQt6.QtCore import Qt
 
-from core.utils import get_emacs_theme_background, get_emacs_theme_foreground, get_emacs_var
+from core.utils import (get_emacs_theme_background, get_emacs_theme_foreground, get_emacs_var,
+                        get_emacs_theme_mode, get_app_dark_mode)
 
 class Color():
     def __init__(self):
@@ -53,3 +54,34 @@ class Color():
     def rgbfList(self, attr):
         color = self.__getitem__(attr)
         return color.getRgbF()[0:3]
+
+class Setting():
+    def __init__(self):
+        self.setting_map = {
+            "enable_store_history": "eaf-pdf-store-history",
+            "user_name": "user-full-name",
+            "make_letters": "eaf-marker-letters",
+            "dark_mode": "eaf-pdf-dark-mode",
+            "dark_exclude_image": "eaf-pdf-dark-exclude-image",
+            "default_zoom": "eaf-pdf-default-zoom",
+            "zoom_step": "eaf-pdf-zoom-step",
+            "scroll_ratio": "eaf-pdf-scroll-ratio",
+            "inline_text_annot_fontsize": "eaf-pdf-inline-text-annot-fontsize",
+            "emacs_theme_mode": get_emacs_theme_mode,
+            "enable_progress": "eaf-pdf-show-progress-on-page"
+        }
+        self.inverted_mode = get_app_dark_mode("eaf-pdf-dark-mode")
+
+    def __getitem__(self, attr):
+        var = self.setting_map[attr]
+        if callable(var):
+            return var()
+        else:
+            return get_emacs_var(var)
+
+    def follow_emacs_theme(self) -> bool:
+        pdf_mode = self.__getitem__("dark_mode")
+        return pdf_mode == "follow" or pdf_mode == "force"
+
+    def toggle_inverted_mode(self):
+        self.inverted_mode = not self.inverted_mode

@@ -25,8 +25,7 @@ from PyQt6.QtGui import QPainter, QPalette
 from PyQt6.QtWidgets import QWidget
 from core.utils import (interactive, eval_in_emacs, message_to_emacs,
                         atomic_edit, get_emacs_var, get_emacs_vars,
-                        get_emacs_func_result, get_app_dark_mode,
-                        get_emacs_theme_mode)
+                        get_emacs_func_result, get_app_dark_mode,                        )
 import fitz
 import time
 import math
@@ -45,38 +44,20 @@ class PdfViewerWidget(QWidget):
 
     translate_double_click_word = pyqtSignal(str)
 
-    def __init__(self, url, color, buffer_id, synctex_info):
+    def __init__(self, url, color, buffer_id, setting, synctex_info):
         super(PdfViewerWidget, self).__init__()
 
         self.url = url
         self.color = color
+        self.setting = setting
+        self.synctex_info = synctex_info
 
         self.buffer_id = buffer_id
-        self.user_name = get_emacs_var("user-full-name")
 
         self.is_button_press = False
 
-        self.synctex_info = synctex_info
-
         self.installEventFilter(self)
         self.setMouseTracking(True)
-
-        (self.marker_letters,
-         self.pdf_dark_mode,
-         self.pdf_dark_exclude_image,
-         self.pdf_default_zoom,
-         self.pdf_zoom_step,
-         self.pdf_scroll_ratio,
-         self.inline_text_annot_fontsize) = get_emacs_vars([
-             "eaf-marker-letters",
-             "eaf-pdf-dark-mode",
-             "eaf-pdf-dark-exclude-image",
-             "eaf-pdf-default-zoom",
-             "eaf-pdf-zoom-step",
-             "eaf-pdf-scroll-ratio",
-             "eaf-pdf-inline-text-annot-fontsize"])
-
-        self.theme_mode = get_emacs_theme_mode()
 
         # Init scale and scale mode.
         self.scale = 1.0
@@ -85,9 +66,9 @@ class PdfViewerWidget(QWidget):
         self.rotation = 0
 
         # Simple string comparation.
-        if (self.pdf_default_zoom != 1.0):
+        if (self.setting["default_zoom"] != 1.0):
             self.read_mode = "fit_to_customize"
-            self.scale = self.pdf_default_zoom
+            self.scale = self.setting["default_zoom"]
         self.horizontal_offset = 0
 
         # Undo/redo annot actions
@@ -147,8 +128,8 @@ class PdfViewerWidget(QWidget):
         self.scroll_offset = 0
         self.scroll_ratio = 0.05
         self.scroll_wheel_lasttime = time.time()
-        if self.pdf_scroll_ratio != 0.05:
-            self.scroll_ratio = self.pdf_scroll_ratio
+        if self.setting["scroll_ratio"] != 0.05:
+            self.scroll_ratio = self.setting["scroll_ratio"]
 
         # Default presentation mode
         self.presentation_mode = False
@@ -189,11 +170,8 @@ class PdfViewerWidget(QWidget):
 
         self.load_document(url)
 
-        # Inverted mode.
-        self.inverted_mode = get_app_dark_mode("eaf-pdf-dark-mode")
-
         # Inverted mode exclude image. (current exclude image inner implement use PDF Only method)
-        self.inverted_image_mode = not self.pdf_dark_exclude_image and self.document.isPDF
+        self.inverted_image_mode = not self.setting["dark_exclude_image"] and self.document.isPDF
 
         # synctex init page
         if self.synctex_info.page_num != None:
@@ -299,12 +277,12 @@ class PdfViewerWidget(QWidget):
             page.cleanup_search_text()
 
         if self.is_jump_link:
-            self.jump_link_key_cache_dict.update(page.mark_jump_link_tips(self.marker_letters))
+            self.jump_link_key_cache_dict.update(page.mark_jump_link_tips(self.setting["make_letters"]))
         else:
             page.cleanup_jump_link_tips()
             self.jump_link_key_cache_dict.clear()
 
-        qpixmap = page.get_qpixmap(scale, self.inverted_mode, self.inverted_image_mode)
+        qpixmap = page.get_qpixmap(scale, self.setting.inverted_mode, self.inverted_image_mode)
 
         self.page_cache_pixmap_dict[index] = qpixmap
         self.document.cache_page(index, page)
@@ -340,12 +318,12 @@ class PdfViewerWidget(QWidget):
 
         # Draw background.
         # change color of background if inverted mode is enable
-        if self.pdf_dark_mode == "follow" or self.pdf_dark_mode == "force":
+        if self.setting.follow_emacs_theme:
             color = self.color["theme_background"]
             painter.setBrush(color)
             painter.setPen(color)
         else:
-            color = self.color["default_background"] if self.inverted_mode else self.color["default_inverted_background"]
+            color = self.color["default_background"] if self.setting.inverted_mode else self.color["default_inverted_background"]
             painter.setBrush(color)
             painter.setPen(color)
 
@@ -402,7 +380,7 @@ class PdfViewerWidget(QWidget):
         # Render current page.
         painter.setFont(self.font)
 
-        if self.rect().width() <= render_width and not self.inverted_mode:
+        if self.rect().width() <= render_width and not self.setting.inverted_mode:
             painter.setPen(inverted_color(self.color["theme_foreground"], True))
         else:
             painter.setPen(inverted_color(self.color["theme_foreground"]))
@@ -434,8 +412,7 @@ class PdfViewerWidget(QWidget):
                                                    self.page_total_number])
 
         # Draw progress on page.
-        show_progress_on_page, = get_emacs_vars(["eaf-pdf-show-progress-on-page"])
-        if show_progress_on_page:
+        if self.setting["enable_progress"]:
             progress_percent = int(current_page * 100 / self.page_total_number)
             painter.drawText(QRect(self.rect().x(),
                                    self.rect().y(),
@@ -589,13 +566,13 @@ class PdfViewerWidget(QWidget):
     @interactive
     def zoom_in(self):
         self.read_mode = "fit_to_customize"
-        self.scale_to(min(10, self.scale + self.pdf_zoom_step))
+        self.scale_to(min(10, self.scale + self.setting["zoom_step"]))
         self.update()
 
     @interactive
     def zoom_out(self):
         self.read_mode = "fit_to_customize"
-        self.scale_to(max(1, self.scale - self.pdf_zoom_step))
+        self.scale_to(max(1, self.scale - self.setting["zoom_step"]))
         self.update()
 
     @interactive
@@ -627,8 +604,7 @@ class PdfViewerWidget(QWidget):
     def toggle_inverted_mode(self):
         # Need clear page cache first, otherwise current page will not inverted until next page.
         self.page_cache_pixmap_dict.clear()
-
-        self.inverted_mode = not self.inverted_mode
+        self.setting.toggle_inverted_mode()
         self.update()
         return
 
@@ -692,7 +668,7 @@ class PdfViewerWidget(QWidget):
             text_color = self.color.rgbfList("inline_text_annot")
             new_annot = page.add_Freetext_Annot(annot_action.annot_rect,
                                               annot_action.annot_content,
-                                              fontsize=self.inline_text_annot_fontsize,
+                                              fontsize=self.setting["inline_text_annot_fontsize"],
                                               fontname="Arial",
                                               text_color=text_color, align=0)
 
@@ -892,7 +868,7 @@ class PdfViewerWidget(QWidget):
                 point = quads[-1].lr # lower right point
                 new_annot = page.addTextAnnot(point, text, icon="Note")
 
-            new_annot.setInfo(title=self.user_name)
+            new_annot.setInfo(title=self.setting["user_name"])
             new_annot.parent = page
 
             annot_action = AnnotAction.create_annot_action("Add", page_index, new_annot)
@@ -908,7 +884,7 @@ class PdfViewerWidget(QWidget):
 
         page = self.document[page_index]
         new_annot = page.addTextAnnot(point, text, icon="Note")
-        new_annot.setInfo(title=self.user_name)
+        new_annot.setInfo(title=self.setting["user_name"])
         new_annot.parent = page
 
         annot_action = AnnotAction.create_annot_action("Add", page_index, new_annot)
@@ -933,13 +909,13 @@ class PdfViewerWidget(QWidget):
 
         page = self.document[page_index]
         fontname = "Arial"
-        fontsize = self.inline_text_annot_fontsize
+        fontsize = self.setting["inline_text_annot_fontsize"]
         annot_rect = self.compute_annot_rect_inline_text(point, fontsize, text)
         text_color = self.color.rgbfList("inline_text_annot")
         new_annot = page.add_Freetext_Annot(annot_rect, text,
                                           fontsize=fontsize, fontname=fontname,
                                           text_color=text_color, align = 0)
-        new_annot.setInfo(title=self.user_name)
+        new_annot.setInfo(title=self.setting["user_name"])
         new_annot.parent = page
 
         annot_action = AnnotAction.create_annot_action("Add", page_index, new_annot)
@@ -1099,7 +1075,7 @@ class PdfViewerWidget(QWidget):
             elif annot.type[0] == fitz.PDF_ANNOT_FREE_TEXT:
                 annot.setInfo(content=annot_text)
                 point = annot.rect.top_left
-                fontsize = self.inline_text_annot_fontsize
+                fontsize = self.setting["inline_text_annot_fontsize"]
                 rect = self.compute_annot_rect_inline_text(point, fontsize, annot_text)
                 annot.setRect(rect)
                 message_to_emacs("Updated inline text annot!")
