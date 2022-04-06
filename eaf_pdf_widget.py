@@ -23,7 +23,7 @@ from PyQt6.QtCore import Qt, QRect, QRectF, QPoint, QEvent, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont, QCursor
 from PyQt6.QtGui import QPainter, QPalette
 from PyQt6.QtWidgets import QWidget
-from core.utils import (interactive, eval_in_emacs, message_to_emacs,
+from core.utils import (interactive, message_to_emacs,
                         atomic_edit, get_emacs_var, get_emacs_vars,
                         get_emacs_func_result, get_app_dark_mode,                        )
 import fitz
@@ -33,6 +33,7 @@ import math
 from eaf_pdf_document import PdfDocument
 from eaf_pdf_utils import inverted_color, support_hit_max
 from eaf_pdf_annot import AnnotAction
+from eaf_pdf_setting import Emacs
 
 def set_page_crop_box(page):
     if hasattr(page, "set_cropbox"):
@@ -407,9 +408,7 @@ class PdfViewerWidget(QWidget):
         current_page = math.floor((self.start_page_index +
                                    self.last_page_index + 1) / 2)
 
-        eval_in_emacs("eaf--pdf-update-position", [self.buffer_id,
-                                                   current_page,
-                                                   self.page_total_number])
+        Emacs.update_position(self.buffer_id, current_page, self.page_total_number)
 
         # Draw progress on page.
         if self.setting["enable_progress"]:
@@ -1119,18 +1118,16 @@ class PdfViewerWidget(QWidget):
         return 100.0 * self.scroll_offset / (self.max_scroll_offset() + self.rect().height())
 
     def update_vertical_offset(self, new_offset):
-        eval_in_emacs("eaf--clear-message", [])
+        Emacs.clear_message()
         if self.scroll_offset != new_offset:
             self.scroll_offset = new_offset
             self.update()
 
             current_page = math.floor((self.start_page_index + self.last_page_index + 1) / 2)
-            eval_in_emacs("eaf--pdf-update-position", [self.buffer_id,
-                                                       current_page,
-                                                       self.page_total_number])
+            Emacs.update_position(self.buffer_id, current_page, self.page_total_number)
 
     def update_horizontal_offset(self, new_offset):
-        eval_in_emacs("eaf--clear-message", [])
+        Emacs.clear_message()
         if self.horizontal_offset != new_offset:
             self.horizontal_offset = new_offset
             self.update()
@@ -1257,7 +1254,7 @@ class PdfViewerWidget(QWidget):
 
             import platform
             if platform.system() == "Darwin":
-                eval_in_emacs('eaf-activate-emacs-window', [])
+                Emacs.active_emacs_window()
 
         elif event.type() == QEvent.Type.MouseButtonDblClick:
             self.disable_popup_text_annot_mode()
@@ -1344,4 +1341,4 @@ class PdfViewerWidget(QWidget):
     def handle_synctex_backward_edit(self):
         ex, ey, page_index = self.get_cursor_absolute_position()
         if page_index is not None:
-            eval_in_emacs("eaf-pdf-synctex-backward-edit", [self.url, page_index + 1, ex, ey])
+            Emacs.synctex_backword_edit(self.url, page_index + 1, ex, ey)

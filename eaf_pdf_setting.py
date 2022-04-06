@@ -22,7 +22,7 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtCore import Qt
 
 from core.utils import (get_emacs_theme_background, get_emacs_theme_foreground, get_emacs_var,
-                        get_emacs_theme_mode, get_app_dark_mode)
+                        get_emacs_theme_mode, get_app_dark_mode, eval_in_emacs)
 
 class Color():
     def __init__(self):
@@ -85,3 +85,27 @@ class Setting():
 
     def toggle_inverted_mode(self):
         self.inverted_mode = not self.inverted_mode
+
+class Emacs():
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def update_position(buffer_id, current_page, total) -> None:
+        eval_in_emacs("eaf--pdf-update-position", [buffer_id, current_page, total])
+
+    @staticmethod
+    def clear_message() -> None:
+        eval_in_emacs("eaf--clear-message", [])
+
+    @staticmethod
+    def active_emacs_window() -> None:
+        eval_in_emacs('eaf-activate-emacs-window', [])
+
+    @staticmethod
+    def synctex_backword_edit(url, page_index, x, y) -> None:
+        eval_in_emacs("eaf-pdf-synctex-backward-edit", [url, page_index, x, y])
+
+    @staticmethod
+    def kill_new(content) -> None:
+        eval_in_emacs('kill-new', [content])

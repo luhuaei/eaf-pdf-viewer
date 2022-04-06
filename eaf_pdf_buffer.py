@@ -20,7 +20,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from core.buffer import Buffer
-from core.utils import (eval_in_emacs, message_to_emacs,translate_text,
+from core.utils import (message_to_emacs,translate_text,
                         atomic_edit, get_emacs_vars, get_emacs_var, get_emacs_config_dir,
                         get_emacs_theme_foreground, get_emacs_theme_background)
 import fitz
@@ -32,7 +32,7 @@ import sys
 sys.path.append(os.path.dirname(__file__))
 
 from eaf_pdf_widget import PdfViewerWidget
-from eaf_pdf_setting import Color, Setting
+from eaf_pdf_setting import Color, Setting, Emacs
 
 class SynctexInfo():
     def __init__(self, info):
@@ -216,7 +216,7 @@ class AppBuffer(Buffer):
     def copy_select(self):
         if self.buffer_widget.is_select_mode:
             content = self.buffer_widget.parse_select_char_list()
-            eval_in_emacs('kill-new', [content])
+            Emacs.kill_new(content)
             message_to_emacs(content)
             self.buffer_widget.cleanup_select()
 
