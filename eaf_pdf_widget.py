@@ -22,7 +22,7 @@
 from PyQt6.QtCore import Qt, QRect, QRectF, QPoint, QEvent, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont, QCursor
 from PyQt6.QtGui import QPainter, QPalette
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtWidgets import QWidget, QScrollArea
 from core.utils import (interactive, message_to_emacs,
                         atomic_edit, get_emacs_var, get_emacs_vars,
                         get_emacs_func_result, get_app_dark_mode,                        )
@@ -41,10 +41,16 @@ def set_page_crop_box(page):
     else:
         return page.setCropBox
 
-class PdfViewerWidget(QWidget):
-
+class PdfViewer(QScrollArea):
     translate_double_click_word = pyqtSignal(str)
 
+    def __init__(self, url, color, buffer_id, setting, synctex_info):
+        super().__init__()
+
+        widget = PdfViewerWidget(url, color, buffer_id, setting, synctex_info)
+        self.setWidget(widget)
+
+class PdfViewerWidget(QWidget):
     def __init__(self, url, color, buffer_id, setting, synctex_info):
         super(PdfViewerWidget, self).__init__()
 
@@ -55,6 +61,7 @@ class PdfViewerWidget(QWidget):
 
         self.buffer_id = buffer_id
 
+        # parent need this arguments
         self.is_button_press = False
 
         self.installEventFilter(self)
@@ -1336,7 +1343,8 @@ class PdfViewerWidget(QWidget):
     def handle_translate_word(self):
         double_click_word = self.get_double_click_word()
         if double_click_word:
-            self.translate_double_click_word.emit(double_click_word)
+            # self.translate_double_click_word.emit(double_click_word)
+            pass
 
     def handle_synctex_backward_edit(self):
         ex, ey, page_index = self.get_cursor_absolute_position()

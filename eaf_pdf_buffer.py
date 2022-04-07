@@ -31,7 +31,7 @@ import threading
 import sys
 sys.path.append(os.path.dirname(__file__))
 
-from eaf_pdf_widget import PdfViewerWidget
+from eaf_pdf_widget import PdfViewer
 from eaf_pdf_setting import Color, Setting, Emacs
 
 class SynctexInfo():
@@ -73,7 +73,7 @@ class AppBuffer(Buffer):
         self.color = Color()
         self.setting = Setting()
         self.synctex_info = SynctexInfo(arguments)
-        self.add_widget(PdfViewerWidget(url, self.color, buffer_id, self.setting, self.synctex_info))
+        self.add_widget(PdfViewer(url, self.color, buffer_id, self.setting, self.synctex_info))
         self.buffer_widget.translate_double_click_word.connect(translate_text)
 
         # Use thread to avoid slow down open speed.
