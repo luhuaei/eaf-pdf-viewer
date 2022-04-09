@@ -19,10 +19,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from PyQt6.QtCore import Qt, QRect, QRectF, QPoint, QEvent, QTimer, pyqtSignal
+from PyQt6.QtCore import (Qt, QRect, QRectF, QPoint, QEvent, QTimer, pyqtSignal, QAbstractListModel,
+                          QVariant, QModelIndex)
 from PyQt6.QtGui import QFont, QCursor
 from PyQt6.QtGui import QPainter, QPalette
-from PyQt6.QtWidgets import QWidget, QScrollArea
+from PyQt6.QtWidgets import QWidget, QListView, QAbstractItemView
 from core.utils import (interactive, message_to_emacs,
                         atomic_edit, get_emacs_var, get_emacs_vars,
                         get_emacs_func_result, get_app_dark_mode,                        )
@@ -41,14 +42,66 @@ def set_page_crop_box(page):
     else:
         return page.setCropBox
 
-class PdfViewer(QScrollArea):
+class PdfModel(QAbstractListModel):
+    def __init__(self, url, color, buffer_id, setting, synctex_info):
+        super().__init__()
+        self.widget = PdfViewerWidget(url, color, buffer_id, setting, synctex_info)
+
+    def data(self, model_index, model_role):
+        '''implement QAbstractListModel data() '''
+        if not model_index.isValid():
+            return QVariant()
+
+        if model_role == Qt.ItemDataRole.DecorationRole:
+            return self.widget.document[model_index.row()].get_qpixmap(1, False)
+
+        return QVariant()
+
+    def rowCount(self, model_index):
+        '''implement QAbstractListModel rowCount() '''
+        return self.widget.document.page_count
+
+    def index(self, row, column, parent=None):
+        if row < 0 or row > self.widget.document.page_count:
+            return QModelIndex()
+
+        return self.createIndex(row, column)
+
+
+class PdfViewer(QListView):
     translate_double_click_word = pyqtSignal(str)
 
     def __init__(self, url, color, buffer_id, setting, synctex_info):
         super().__init__()
+        self.setUniformItemSizes(True)
+        self.setSpacing(10)
+        # setting view
+        self.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
 
-        widget = PdfViewerWidget(url, color, buffer_id, setting, synctex_info)
-        self.setWidget(widget)
+        # setting scrollbar step
+        self.horizontalScrollBar().setSingleStep(30)
+        self.verticalScrollBar().setSingleStep(30)
+        # hide scrollbar
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        self.model = PdfModel(url, color, buffer_id, setting, synctex_info)
+        self.setModel(self.model)
+
+    @interactive
+    def scroll_to_begin(self):
+        self.scrollToTop()
+
+    @interactive
+    def scroll_to_end(self):
+        self.scrollToBottom()
+
+    @interactive
+    def scroll_up_page(self):
+        index = self.model.index(5, 1)
+        self.scrollTo(index, QAbstractItemView.ScrollHint.PositionAtTop)
 
 class PdfViewerWidget(QWidget):
     def __init__(self, url, color, buffer_id, setting, synctex_info):
