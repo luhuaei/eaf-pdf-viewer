@@ -23,7 +23,7 @@ from PyQt6.QtCore import (Qt, QRect, QRectF, QPoint, QEvent, QTimer, pyqtSignal,
                           QVariant, QModelIndex)
 from PyQt6.QtGui import QFont, QCursor
 from PyQt6.QtGui import QPainter, QPalette
-from PyQt6.QtWidgets import QWidget, QListView, QAbstractItemView
+from PyQt6.QtWidgets import QWidget, QListView, QAbstractItemView, QAbstractItemDelegate
 from core.utils import (interactive, message_to_emacs,
                         atomic_edit, get_emacs_var, get_emacs_vars,
                         get_emacs_func_result, get_app_dark_mode,                        )
@@ -43,10 +43,11 @@ def set_page_crop_box(page):
     else:
         return page.setCropBox
 
+
 class PdfModel(QAbstractListModel):
     def __init__(self, url, color, buffer_id, setting, synctex_info):
         super().__init__()
-        self.widget = PdfViewerWidget(url, color, buffer_id, setting, synctex_info)
+        self._widget = PdfViewerWidget(url, color, buffer_id, setting, synctex_info)
 
     def data(self, model_index, model_role):
         '''implement QAbstractListModel data() '''
@@ -54,22 +55,28 @@ class PdfModel(QAbstractListModel):
             return QVariant()
 
         if model_role == Qt.ItemDataRole.DecorationRole:
-            return self.widget.document[model_index.row()].get_qpixmap(1, False)
+            return self._widget.document[model_index.row()].get_qpixmap(1, False)
 
         return QVariant()
 
     def rowCount(self, model_index):
         '''implement QAbstractListModel rowCount() '''
-        return self.widget.document.page_count
+        return self._widget.document.page_count
 
     def index(self, row, column, parent=None):
-        if row < 0 or row > self.widget.document.page_count:
+        if row < 0 or row > self._widget.document.page_count:
             return QModelIndex()
 
         if column != 0:
             return QModelIndex()
 
         return self.createIndex(row, column)
+
+    def item_width(self):
+        return self._widget.document.page_cropbox(0).width
+
+    def item_height(self):
+        return self._widget.document.page_cropbox(0).height
 
 
 class PdfViewer(QListView):
@@ -91,63 +98,52 @@ class PdfViewer(QListView):
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
-        self.model = PdfModel(url, color, buffer_id, setting, synctex_info)
-        self.setModel(self.model)
-        self.setCurrentIndex(self.model.index(0, 0))
+        # setting view model
+        self.setModel(PdfModel(url, color, buffer_id, setting, synctex_info))
 
-    def update_current_model_index(func):
-        def update(*args):
-            this = args[0]
-            size = this.maximumViewportSize()
-            print("Size: ", size.width(), size.height())
+    def item_width(self):
+        # item actually width add left padding and right padding
+        return self.model().item_width() + 2 * self.spacing()
+    def item_height(self):
+        # item actually height add top padding and bottom padding
+        return self.model().item_height() + 2 * self.spacing()
 
-            left = this.horizontalOffset() + this.spacing()
-            top = this.verticalOffset()
-            print("Left: ", left)
-            print("Top: ", top)
-            index = this.indexAt(QPoint(left, top))
-            if index.isValid():
-                print("Set Current index: ", index.row(), index.column())
-                this.setCurrentIndex(index)
-
-        def wrapper(*args):
-            result = func(*args)
-            threading.Thread(target=update, args=args).start()
-            return result
-
-        return wrapper
+    def item_index(self):
+        offset = self.verticalOffset()
+        return round(offset / self.item_height()), 0
 
     @interactive
-    @update_current_model_index
     def scroll_to_begin(self):
         self.scrollToTop()
 
     @interactive
-    @update_current_model_index
     def scroll_to_end(self):
         self.scrollToBottom()
 
     @interactive
-    @update_current_model_index
     def scroll_down(self):
         self.verticalScrollBar().setValue(self.verticalOffset()-30)
 
     @interactive
-    @update_current_model_index
     def scroll_up(self):
         self.verticalScrollBar().setValue(self.verticalOffset()+30)
 
-    def scroll_page(self, direction="up"):
-        current_index = self.currentIndex()
-        if direction == "up":
-            index = self.model.index(current_index.row()+1, 0)
-        elif direction == "down":
-            index = self.model.index(current_index.row()-1, 0)
-
+    def jump_to_page(self, page_num):
+        index = self.model().index(page_num, 0)
         if not index.isValid():
             return
-        self.setCurrentIndex(index)
         self.scrollTo(index)
+
+    def scroll_page(self, direction="up"):
+        offset = self.verticalOffset()
+        height = self.item_height()
+
+        if direction == "up":
+            to = offset + height
+        elif direction == "down":
+            to = offset - height
+
+        self.verticalScrollBar().setValue(int(to))
 
     @interactive
     def scroll_up_page(self):
