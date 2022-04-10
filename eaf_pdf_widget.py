@@ -30,6 +30,7 @@ from core.utils import (interactive, message_to_emacs,
 import fitz
 import time
 import math
+import threading
 
 from eaf_pdf_document import PdfDocument
 from eaf_pdf_utils import inverted_color, support_hit_max
@@ -65,6 +66,9 @@ class PdfModel(QAbstractListModel):
         if row < 0 or row > self.widget.document.page_count:
             return QModelIndex()
 
+        if column != 0:
+            return QModelIndex()
+
         return self.createIndex(row, column)
 
 
@@ -89,19 +93,70 @@ class PdfViewer(QListView):
 
         self.model = PdfModel(url, color, buffer_id, setting, synctex_info)
         self.setModel(self.model)
+        self.setCurrentIndex(self.model.index(0, 0))
+
+    def update_current_model_index(func):
+        def update(*args):
+            this = args[0]
+            size = this.maximumViewportSize()
+            print("Size: ", size.width(), size.height())
+
+            left = this.horizontalOffset() + this.spacing()
+            top = this.verticalOffset()
+            print("Left: ", left)
+            print("Top: ", top)
+            index = this.indexAt(QPoint(left, top))
+            if index.isValid():
+                print("Set Current index: ", index.row(), index.column())
+                this.setCurrentIndex(index)
+
+        def wrapper(*args):
+            result = func(*args)
+            threading.Thread(target=update, args=args).start()
+            return result
+
+        return wrapper
 
     @interactive
+    @update_current_model_index
     def scroll_to_begin(self):
         self.scrollToTop()
 
     @interactive
+    @update_current_model_index
     def scroll_to_end(self):
         self.scrollToBottom()
 
     @interactive
+    @update_current_model_index
+    def scroll_down(self):
+        self.verticalScrollBar().setValue(self.verticalOffset()-30)
+
+    @interactive
+    @update_current_model_index
+    def scroll_up(self):
+        self.verticalScrollBar().setValue(self.verticalOffset()+30)
+
+    def scroll_page(self, direction="up"):
+        current_index = self.currentIndex()
+        if direction == "up":
+            index = self.model.index(current_index.row()+1, 0)
+        elif direction == "down":
+            index = self.model.index(current_index.row()-1, 0)
+
+        if not index.isValid():
+            return
+        self.setCurrentIndex(index)
+        self.scrollTo(index)
+
+    @interactive
     def scroll_up_page(self):
-        index = self.model.index(5, 1)
-        self.scrollTo(index, QAbstractItemView.ScrollHint.PositionAtTop)
+        self.scroll_page("up")
+
+    @interactive
+    def scroll_down_page(self):
+        self.scroll_page("down")
+
 
 class PdfViewerWidget(QWidget):
     def __init__(self, url, color, buffer_id, setting, synctex_info):
