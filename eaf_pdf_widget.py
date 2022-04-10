@@ -20,7 +20,7 @@
 
 
 from PyQt6.QtCore import (Qt, QRect, QRectF, QPoint, QEvent, QTimer, pyqtSignal, QAbstractListModel,
-                          QVariant, QModelIndex)
+                          QVariant, QModelIndex, QSize)
 from PyQt6.QtGui import QFont, QCursor
 from PyQt6.QtGui import QPainter, QPalette
 from PyQt6.QtWidgets import QWidget, QListView, QAbstractItemView, QAbstractItemDelegate
@@ -42,6 +42,45 @@ def set_page_crop_box(page):
         return page.set_cropbox
     else:
         return page.setCropBox
+
+class PdfDelegate(QAbstractItemDelegate):
+    def __init__(self, setting, color):
+        super().__init__()
+        self._setting = setting
+        self._color = color
+
+    def brush_pen_color(self):
+        # Draw background.
+        # change color of background if inverted mode is enable
+        if self._setting.follow_emacs_theme:
+            color = self._color["theme_background"]
+        elif self._setting.inverted_mode:
+            color = self._color["default_background"]
+        else:
+            color = self._color["default_inverted_background"]
+
+        return color
+
+    def paint(self, painter, option, model_index):
+        option.displayAlignment = Qt.AlignmentFlag.AlignHCenter
+
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceAtop)
+        painter.save()
+
+        color = self.brush_pen_color()
+        painter.setBrush(color)
+        painter.setPen(color)
+
+        painter.drawRect(option.rect)
+        painter.drawPixmap(option.rect, model_index.data(Qt.ItemDataRole.DecorationRole))
+        painter.restore()
+
+    def sizeHint(self, option, model_index) -> QSize:
+        if not model_index.isValid():
+            return QSize(0, 0)
+        model = model_index.model()
+        return QSize(int(model.item_width()), int(model.item_height()))
 
 
 class PdfModel(QAbstractListModel):
@@ -100,6 +139,9 @@ class PdfViewer(QListView):
 
         # setting view model
         self.setModel(PdfModel(url, color, buffer_id, setting, synctex_info))
+
+        # setting delegrate
+        self.setItemDelegate(PdfDelegate(setting, color))
 
     def item_width(self):
         # item actually width add left padding and right padding
