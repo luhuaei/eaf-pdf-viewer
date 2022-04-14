@@ -21,9 +21,8 @@
 
 from PyQt6.QtCore import (Qt, QRect, QRectF, QPoint, QEvent, QTimer, pyqtSignal, QAbstractListModel,
                           QVariant, QModelIndex, QSize)
-from PyQt6.QtGui import QFont, QCursor
-from PyQt6.QtGui import QPainter, QPalette
-from PyQt6.QtWidgets import QWidget, QListView, QAbstractItemView, QAbstractItemDelegate
+from PyQt6.QtGui import QFont, QCursor, QPainter, QPalette, QResizeEvent
+from PyQt6.QtWidgets import QWidget, QListView, QAbstractItemView, QAbstractItemDelegate, QStyledItemDelegate
 from core.utils import (interactive, message_to_emacs,
                         atomic_edit, get_emacs_var, get_emacs_vars,
                         get_emacs_func_result, get_app_dark_mode,                        )
@@ -43,50 +42,27 @@ def set_page_crop_box(page):
     else:
         return page.setCropBox
 
-class PdfDelegate(QAbstractItemDelegate):
-    def __init__(self, setting, color):
-        super().__init__()
-        self._setting = setting
-        self._color = color
-
-    def brush_pen_color(self):
-        # Draw background.
-        # change color of background if inverted mode is enable
-        if self._setting.follow_emacs_theme:
-            color = self._color["theme_background"]
-        elif self._setting.inverted_mode:
-            color = self._color["default_background"]
-        else:
-            color = self._color["default_inverted_background"]
-
-        return color
-
-    def paint(self, painter, option, model_index):
-        option.displayAlignment = Qt.AlignmentFlag.AlignHCenter
-
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceAtop)
-        painter.save()
-
-        color = self.brush_pen_color()
-        painter.setBrush(color)
-        painter.setPen(color)
-
-        painter.drawRect(option.rect)
-        painter.drawPixmap(option.rect, model_index.data(Qt.ItemDataRole.DecorationRole))
-        painter.restore()
-
-    def sizeHint(self, option, model_index) -> QSize:
-        if not model_index.isValid():
-            return QSize(0, 0)
-        model = model_index.model()
-        return QSize(int(model.item_width()), int(model.item_height()))
-
-
 class PdfModel(QAbstractListModel):
+    scale = pyqtSignal(float)
+    change = pyqtSignal(bool)
+
     def __init__(self, url, color, buffer_id, setting, synctex_info):
         super().__init__()
-        self._widget = PdfViewerWidget(url, color, buffer_id, setting, synctex_info)
+        self._document = PdfDocument(fitz.open(url))
+
+        self._scale = 1.0
+        self.scale.connect(self.update_scale)
+
+    def update_scale(self, scale_step):
+        scale = self._scale + scale_step
+        if scale > 10:
+            scale = 10
+        elif scale < 1:
+            scale = 1
+
+        if self._scale != scale:
+            self._scale = scale
+            self.change.emit(True)
 
     def data(self, model_index, model_role):
         '''implement QAbstractListModel data() '''
@@ -94,16 +70,16 @@ class PdfModel(QAbstractListModel):
             return QVariant()
 
         if model_role == Qt.ItemDataRole.DecorationRole:
-            return self._widget.document[model_index.row()].get_qpixmap(1, False)
+            return self._document[model_index.row()].get_qpixmap(self._scale, False)
 
         return QVariant()
 
     def rowCount(self, model_index):
         '''implement QAbstractListModel rowCount() '''
-        return self._widget.document.page_count
+        return self._document.page_count
 
     def index(self, row, column, parent=None):
-        if row < 0 or row > self._widget.document.page_count:
+        if row < 0 or row > self._document.page_count:
             return QModelIndex()
 
         if column != 0:
@@ -111,11 +87,17 @@ class PdfModel(QAbstractListModel):
 
         return self.createIndex(row, column)
 
-    def item_width(self):
-        return self._widget.document.page_cropbox(0).width
+    def page_origin_width(self):
+        return self._document.page_cropbox(0).width
+
+    def page_origin_height(self):
+        return self._document.page_cropbox(0).height * 2
 
     def item_height(self):
-        return self._widget.document.page_cropbox(0).height
+        return self._scale * self.page_origin_height()
+
+    def item_width(self):
+        return self._scale * self.page_origin_width()
 
 
 class PdfViewer(QListView):
@@ -123,8 +105,16 @@ class PdfViewer(QListView):
 
     def __init__(self, url, color, buffer_id, setting, synctex_info):
         super().__init__()
+
+        # widget inner variable
+        self._color = color
+        self._setting = setting
+
         self.setUniformItemSizes(True)
+
+        # setting padding
         self.setSpacing(10)
+
         # setting view
         self.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
@@ -138,10 +128,16 @@ class PdfViewer(QListView):
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         # setting view model
-        self.setModel(PdfModel(url, color, buffer_id, setting, synctex_info))
+        model = PdfModel(url, color, buffer_id, setting, synctex_info)
+        self.setModel(model)
+        model.change.connect(self.model_change)
 
-        # setting delegrate
-        self.setItemDelegate(PdfDelegate(setting, color))
+        # record scale
+        self.scale = 1
+
+    def model_change(self, updated):
+        if updated:
+            self.update()
 
     def item_width(self):
         # item actually width add left padding and right padding
@@ -194,6 +190,14 @@ class PdfViewer(QListView):
     @interactive
     def scroll_down_page(self):
         self.scroll_page("down")
+
+    @interactive
+    def zoom_in(self):
+        self.model().scale.emit(0.5)
+
+    @interactive
+    def zoom_out(self):
+        self.model().scale.emit(-0.5)
 
 
 class PdfViewerWidget(QWidget):

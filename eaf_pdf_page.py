@@ -188,7 +188,7 @@ class PdfPage(fitz.Page):
         if not invert_image and invert:
             pixmap = self.with_invert_exclude_image(scale, pixmap)
 
-        img = QImage(pixmap.samples, pixmap.width, pixmap.height, pixmap.stride, QImage.Format.Format_RGBA8888)
+        img = QImage(pixmap.samples_mv, pixmap.width, pixmap.height, pixmap.stride, QImage.Format.Format_RGBA8888)
         qpixmap = QPixmap.fromImage(img)
 
         if self.has_annot:
