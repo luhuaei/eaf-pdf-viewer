@@ -22,7 +22,7 @@
 from PyQt6.QtCore import (Qt, QRect, QRectF, QPoint, QEvent, QTimer, pyqtSignal, QAbstractListModel,
                           QVariant, QModelIndex, QSize)
 from PyQt6.QtGui import QFont, QCursor, QPainter, QPalette, QResizeEvent
-from PyQt6.QtWidgets import QWidget, QListView, QAbstractItemView, QAbstractItemDelegate, QStyledItemDelegate
+from PyQt6.QtWidgets import (QWidget, QListView, QAbstractItemView, QAbstractItemDelegate, QStyledItemDelegate)
 from core.utils import (interactive, message_to_emacs,
                         atomic_edit, get_emacs_var, get_emacs_vars,
                         get_emacs_func_result, get_app_dark_mode,                        )
@@ -72,9 +72,13 @@ class PdfDelegate(QAbstractItemDelegate):
         painter.setPen(color)
 
         qpixmap = model_index.data(Qt.ItemDataRole.DecorationRole)
+
         # the page qpixmap rect
-        rect = QRect(option.rect.x(), option.rect.y(), qpixmap.rect().width(), qpixmap.rect().height())
-        # setting center
+        # FIXME:
+        # make qpixmap horizontal center when qpixmap overflow visual rect
+        rect = QRect(option.rect.x(), option.rect.y(), qpixmap.size().width(), qpixmap.size().height())
+
+        # move the qpixmap rect to visual rect center
         rect.moveCenter(option.rect.center())
 
         # draw qpixmap rect background color
@@ -168,11 +172,12 @@ class PdfViewer(QListView):
         self.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
 
-        # setting scrollbar step
+        # setting scrollbar
         self.horizontalScrollBar().setSingleStep(30)
         self.verticalScrollBar().setSingleStep(30)
-        # hide scrollbar
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # FIXME:
+        # when horizontal bar set to ScrollBarAlwaysOff cause horizontal scroll not working
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         # setting view model
@@ -213,6 +218,14 @@ class PdfViewer(QListView):
     @interactive
     def scroll_up(self):
         self.verticalScrollBar().setValue(self.verticalOffset()+30)
+
+    @interactive
+    def scroll_right(self):
+        self.horizontalScrollBar().setValue(self.horizontalOffset()+30)
+
+    @interactive
+    def scroll_left(self):
+        self.horizontalScrollBar().setValue(self.horizontalOffset()-30)
 
     def jump_to_page(self, page_num):
         index = self.model().index(page_num, 0)
