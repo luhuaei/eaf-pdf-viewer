@@ -42,6 +42,52 @@ def set_page_crop_box(page):
     else:
         return page.setCropBox
 
+class PdfDelegate(QAbstractItemDelegate):
+    def __init__(self, setting, color):
+        super().__init__()
+        self._setting = setting
+        self._color = color
+
+    def brush_pen_color(self):
+        # Draw background.
+        # change color of background if inverted mode is enable
+        if self._setting.follow_emacs_theme:
+            color = self._color["theme_background"]
+        elif self._setting.inverted_mode:
+            color = self._color["default_background"]
+        else:
+            color = self._color["default_inverted_background"]
+
+        return color
+
+    def paint(self, painter, option, model_index):
+        option.displayAlignment = Qt.AlignmentFlag.AlignHCenter
+
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceAtop)
+        painter.save()
+
+        color = self.brush_pen_color()
+        painter.setBrush(color)
+        painter.setPen(color)
+
+        qpixmap = model_index.data(Qt.ItemDataRole.DecorationRole)
+        # the page qpixmap rect
+        rect = QRect(option.rect.x(), option.rect.y(), qpixmap.rect().width(), qpixmap.rect().height())
+        # setting center
+        rect.moveCenter(option.rect.center())
+
+        # draw qpixmap rect background color
+        painter.drawRect(rect)
+
+        # draw page qpixmap contents
+        painter.drawPixmap(rect, qpixmap)
+        painter.restore()
+
+    def sizeHint(self, option, model_index):
+        return model_index.data(Qt.ItemDataRole.SizeHintRole)
+
+
 class PdfModel(QAbstractListModel):
     scale = pyqtSignal(float)
 
@@ -115,8 +161,6 @@ class PdfViewer(QListView):
 
         # setting
         self.setSpacing(10)
-        self.setLayoutMode(QListView.LayoutMode.Batched)
-        self.setBatchSize(5)
         self.setResizeMode(QListView.ResizeMode.Adjust)
 
         # setting view
@@ -134,6 +178,14 @@ class PdfViewer(QListView):
         # setting view model
         model = PdfModel(url, color, buffer_id, setting, synctex_info)
         self.setModel(model)
+
+        # setting delegrate
+        delegate = PdfDelegate(setting, color)
+        self.setItemDelegate(delegate)
+
+    # implement sizeHint function
+    def sizeHint(self):
+        return self.item_size()
 
     def item_size(self):
         # item actually width add left padding and right padding
@@ -194,9 +246,6 @@ class PdfViewer(QListView):
     @interactive
     def zoom_out(self):
         self.model().scale.emit(-0.5)
-
-    def sizeHint(self):
-        return self.item_size()
 
 class PdfViewerWidget(QWidget):
     def __init__(self, url, color, buffer_id, setting, synctex_info):
