@@ -44,7 +44,6 @@ def set_page_crop_box(page):
 
 class PdfModel(QAbstractListModel):
     scale = pyqtSignal(float)
-    change = pyqtSignal(bool)
 
     def __init__(self, url, color, buffer_id, setting, synctex_info):
         super().__init__()
@@ -62,7 +61,7 @@ class PdfModel(QAbstractListModel):
 
         if self._scale != scale:
             self._scale = scale
-            self.change.emit(True)
+            self.layoutChanged.emit()
 
     def data(self, model_index, model_role):
         '''implement QAbstractListModel data() '''
@@ -71,6 +70,8 @@ class PdfModel(QAbstractListModel):
 
         if model_role == Qt.ItemDataRole.DecorationRole:
             return self._document[model_index.row()].get_qpixmap(self._scale, False)
+        elif model_role == Qt.ItemDataRole.SizeHintRole:
+            return QSize(self.item_width(), self.item_height())
 
         return QVariant()
 
@@ -91,13 +92,13 @@ class PdfModel(QAbstractListModel):
         return self._document.page_cropbox(0).width
 
     def page_origin_height(self):
-        return self._document.page_cropbox(0).height * 2
+        return self._document.page_cropbox(0).height
 
     def item_height(self):
-        return self._scale * self.page_origin_height()
+        return int(self._scale * self.page_origin_height())
 
     def item_width(self):
-        return self._scale * self.page_origin_width()
+        return int(self._scale * self.page_origin_width())
 
 
 class PdfViewer(QListView):
@@ -112,8 +113,11 @@ class PdfViewer(QListView):
 
         self.setUniformItemSizes(True)
 
-        # setting padding
+        # setting
         self.setSpacing(10)
+        self.setLayoutMode(QListView.LayoutMode.Batched)
+        self.setBatchSize(5)
+        self.setResizeMode(QListView.ResizeMode.Adjust)
 
         # setting view
         self.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
@@ -130,25 +134,17 @@ class PdfViewer(QListView):
         # setting view model
         model = PdfModel(url, color, buffer_id, setting, synctex_info)
         self.setModel(model)
-        model.change.connect(self.model_change)
 
-        # record scale
-        self.scale = 1
-
-    def model_change(self, updated):
-        if updated:
-            self.update()
-
-    def item_width(self):
+    def item_size(self):
         # item actually width add left padding and right padding
-        return self.model().item_width() + 2 * self.spacing()
-    def item_height(self):
         # item actually height add top padding and bottom padding
-        return self.model().item_height() + 2 * self.spacing()
+        index = self.model().index(0, 0)
+        size = self.model().data(index, Qt.ItemDataRole.SizeHintRole)
+        return QSize(size.width() + 2 * self.spacing(), size.height() + 2 * self.spacing())
 
     def item_index(self):
         offset = self.verticalOffset()
-        return round(offset / self.item_height()), 0
+        return round(offset / self.item_size().height())
 
     @interactive
     def scroll_to_begin(self):
@@ -174,7 +170,7 @@ class PdfViewer(QListView):
 
     def scroll_page(self, direction="up"):
         offset = self.verticalOffset()
-        height = self.item_height()
+        height = self.item_size().height()
 
         if direction == "up":
             to = offset + height
@@ -199,6 +195,8 @@ class PdfViewer(QListView):
     def zoom_out(self):
         self.model().scale.emit(-0.5)
 
+    def sizeHint(self):
+        return self.item_size()
 
 class PdfViewerWidget(QWidget):
     def __init__(self, url, color, buffer_id, setting, synctex_info):
