@@ -239,11 +239,10 @@ class PdfViewer(QListView):
     def scroll_left(self):
         self.horizontalScrollBar().setValue(self.horizontalOffset()-30)
 
-    def jump_to_page(self, page_num):
-        index = self.model().index(page_num, 0)
-        if not index.isValid():
-            return
-        self.scrollTo(index)
+    @interactive
+    def scroll_center_horizontal(self):
+        center = self.horizontalScrollBar().maximum() / 2
+        self.horizontalScrollBar().setValue(int(center))
 
     def scroll_page(self, direction="up"):
         offset = self.verticalOffset()
@@ -264,6 +263,15 @@ class PdfViewer(QListView):
     def scroll_down_page(self):
         self.scroll_page("down")
 
+    def jump_to_page(self, page_num):
+        index = self.model().index(page_num, 0)
+        if not index.isValid():
+            return
+        self.scrollTo(index)
+
+    def jump_to_percent(self, percent):
+        pass
+
     @interactive
     def zoom_in(self):
         self.model().scale.emit(0.5)
@@ -271,6 +279,14 @@ class PdfViewer(QListView):
     @interactive
     def zoom_out(self):
         self.model().scale.emit(-0.5)
+
+    @interactive
+    def zoom_reset(self):
+        pass
+
+    @interactive
+    def zoom_fit_text_width(self):
+        pass
 
     @interactive
     def toggle_read_mode(self):
