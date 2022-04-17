@@ -22,7 +22,7 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtCore import Qt
 
 from core.utils import (get_emacs_theme_background, get_emacs_theme_foreground, get_emacs_var,
-                        get_emacs_theme_mode, get_app_dark_mode, eval_in_emacs)
+                        get_emacs_theme_mode, get_app_dark_mode, eval_in_emacs, message_to_emacs)
 
 class Color():
     def __init__(self):
@@ -132,3 +132,7 @@ class Emacs():
     @staticmethod
     def kill_new(content) -> None:
         eval_in_emacs('kill-new', [content])
+
+    @staticmethod
+    def message(msg):
+        message_to_emacs("Reloaded PDF file!")

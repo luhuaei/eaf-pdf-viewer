@@ -95,9 +95,11 @@ class PdfDelegate(QAbstractItemDelegate):
 class PdfModel(QAbstractListModel):
     scale = pyqtSignal(float)
     read_mode = pyqtSignal(QRect)
+    reload = pyqtSignal()
 
     def __init__(self, url, color, buffer_id, setting, synctex_info):
         super().__init__()
+        self._url = url
         self._color = color
         self._setting = setting
         self._document = PdfDocument(fitz.open(url))
@@ -106,6 +108,7 @@ class PdfModel(QAbstractListModel):
         self.scale.connect(self.update_scale_by_step)
 
         self.read_mode.connect(self.update_read_mode)
+        self.reload.connect(self.reload_document)
 
     def _update_scale(self, scale):
         if scale > 10:
@@ -124,6 +127,9 @@ class PdfModel(QAbstractListModel):
         page_rect = QRect(0, 0, self.page_origin_width(), self.page_origin_height())
         scale = self._setting.get_read_mode_scale(page_rect, visual_rect)
         self._update_scale(scale)
+
+    def reload_document(self):
+        self._document = PdfDocument(fitz.open(self._url))
 
     def data(self, model_index, model_role):
         '''implement QAbstractListModel data() '''
@@ -314,6 +320,11 @@ class PdfViewer(QListView):
     def jump_to_saved_pos(self):
         print("Not implement")
         pass
+
+    @interactive
+    def reload_document(self):
+        Emacs.message("Reloaded PDF file!")
+        self.model().reload.emit()
 
 class PdfViewerWidget(QWidget):
     def __init__(self, url, color, buffer_id, setting, synctex_info):
