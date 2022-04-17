@@ -270,7 +270,9 @@ class PdfViewer(QListView):
         self.scrollTo(index)
 
     def jump_to_percent(self, percent):
-        pass
+        count = self.model().rowCount(self.model().index(0, 0))
+        page_index = int(count * (percent / 100.0))
+        self.jump_to_page(page_index)
 
     @interactive
     def zoom_in(self):
