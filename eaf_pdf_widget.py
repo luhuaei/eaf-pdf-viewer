@@ -21,7 +21,7 @@
 
 from PyQt6.QtCore import (Qt, QRect, QRectF, QPoint, QEvent, QTimer, pyqtSignal, QAbstractListModel,
                           QVariant, QModelIndex, QSize)
-from PyQt6.QtGui import QFont, QCursor, QPainter, QPalette, QResizeEvent
+from PyQt6.QtGui import (QFont, QCursor, QPainter, QPalette, QResizeEvent, QTransform)
 from PyQt6.QtWidgets import (QWidget, QListView, QAbstractItemView, QAbstractItemDelegate, QStyledItemDelegate)
 from core.utils import (interactive, message_to_emacs,
                         atomic_edit, get_emacs_var, get_emacs_vars,
@@ -94,6 +94,7 @@ class PdfDelegate(QAbstractItemDelegate):
 
 class PdfModel(QAbstractListModel):
     scale = pyqtSignal(float)
+    device_pixel_ratio = pyqtSignal(float)
     read_mode = pyqtSignal(QRect)
     reload = pyqtSignal()
 
@@ -106,6 +107,9 @@ class PdfModel(QAbstractListModel):
 
         self._scale = 1.0
         self.scale.connect(self.update_scale_by_step)
+
+        self._device_pixel_ratio = 1.0
+        self.device_pixel_ratio.connect(self.update_device_pixel_ratio)
 
         self.read_mode.connect(self.update_read_mode)
         self.reload.connect(self.reload_document)
@@ -123,6 +127,11 @@ class PdfModel(QAbstractListModel):
     def update_scale_by_step(self, scale_step):
         self._update_scale(self._scale + scale_step)
 
+    def update_device_pixel_ratio(self, ratio):
+        if ratio != self._device_pixel_ratio:
+            self._device_pixel_ratio = ratio
+            self.layoutChanged.emit()
+
     def update_read_mode(self, visual_rect):
         page_rect = QRect(0, 0, self.page_origin_width(), self.page_origin_height())
         scale = self._setting.get_read_mode_scale(page_rect, visual_rect)
@@ -137,7 +146,9 @@ class PdfModel(QAbstractListModel):
             return QVariant()
 
         if model_role == Qt.ItemDataRole.DecorationRole:
-            return self._document[model_index.row()].get_qpixmap(self._scale, False)
+            scale = self._device_pixel_ratio * self._scale
+            qpixmap = self._document[model_index.row()].get_qpixmap(scale, False)
+            return qpixmap
         elif model_role == Qt.ItemDataRole.SizeHintRole:
             return QSize(self.item_width(), self.item_height())
 
@@ -202,6 +213,7 @@ class PdfViewer(QListView):
         # setting view model
         model = PdfModel(url, color, buffer_id, setting, synctex_info)
         self.setModel(model)
+        model.device_pixel_ratio.emit(self.devicePixelRatioF())
 
         # setting delegrate
         delegate = PdfDelegate(setting, color)
@@ -325,6 +337,14 @@ class PdfViewer(QListView):
     def reload_document(self):
         Emacs.message("Reloaded PDF file!")
         self.model().reload.emit()
+
+    @interactive
+    def rotate_clockwise(self):
+        pass
+
+    @interactive
+    def rotate_counterclockwise(self):
+        pass
 
 class PdfViewerWidget(QWidget):
     def __init__(self, url, color, buffer_id, setting, synctex_info):
