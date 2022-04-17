@@ -103,6 +103,9 @@ class Setting():
             return visual_rect.height() / page_rect.height()
         return 0.0
 
+    def reset_scale_to_width(self):
+        self.read_mode = "fit_to_width"
+
 class Emacs():
     def __init__(self):
         pass

@@ -162,7 +162,8 @@ class PdfModel(QAbstractListModel):
     def item_width(self):
         return int(self._scale * self.page_origin_width())
 
-
+# FIXME:
+# - when layoutChanged reserved current position
 class PdfViewer(QListView):
     translate_double_click_word = pyqtSignal(str)
 
@@ -284,7 +285,8 @@ class PdfViewer(QListView):
 
     @interactive
     def zoom_reset(self):
-        pass
+        self._setting.reset_scale_to_width()
+        self.model().read_mode.emit(self.rect())
 
     @interactive
     def zoom_fit_text_width(self):
