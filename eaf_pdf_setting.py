@@ -106,6 +106,9 @@ class Setting():
     def reset_scale_to_width(self):
         self.read_mode = "fit_to_width"
 
+    def reset_scale_to_height(self):
+        self.read_mode = "fit_to_height"
+
 class Emacs():
     def __init__(self):
         pass

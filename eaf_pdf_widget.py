@@ -290,12 +290,30 @@ class PdfViewer(QListView):
 
     @interactive
     def zoom_fit_text_width(self):
+        print("Not implement")
         pass
 
     @interactive
     def toggle_read_mode(self):
         self._setting.toggle_read_mode()
         self.model().read_mode.emit(self.rect())
+
+    @interactive
+    def toggle_presentation_mode(self):
+        index = self.item_index()
+        self._setting.reset_scale_to_height()
+        self.model().read_mode.emit(self.rect())
+        self.jump_to_page(index)
+
+    @interactive
+    def save_current_pos(self):
+        print("Not implement")
+        pass
+
+    @interactive
+    def jump_to_saved_pos(self):
+        print("Not implement")
+        pass
 
 class PdfViewerWidget(QWidget):
     def __init__(self, url, color, buffer_id, setting, synctex_info):
