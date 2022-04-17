@@ -94,16 +94,20 @@ class PdfDelegate(QAbstractItemDelegate):
 
 class PdfModel(QAbstractListModel):
     scale = pyqtSignal(float)
+    read_mode = pyqtSignal(QRect)
 
     def __init__(self, url, color, buffer_id, setting, synctex_info):
         super().__init__()
+        self._color = color
+        self._setting = setting
         self._document = PdfDocument(fitz.open(url))
 
         self._scale = 1.0
-        self.scale.connect(self.update_scale)
+        self.scale.connect(self.update_scale_by_step)
 
-    def update_scale(self, scale_step):
-        scale = self._scale + scale_step
+        self.read_mode.connect(self.update_read_mode)
+
+    def _update_scale(self, scale):
         if scale > 10:
             scale = 10
         elif scale < 1:
@@ -112,6 +116,14 @@ class PdfModel(QAbstractListModel):
         if self._scale != scale:
             self._scale = scale
             self.layoutChanged.emit()
+
+    def update_scale_by_step(self, scale_step):
+        self._update_scale(self._scale + scale_step)
+
+    def update_read_mode(self, visual_rect):
+        page_rect = QRect(0, 0, self.page_origin_width(), self.page_origin_height())
+        scale = self._setting.get_read_mode_scale(page_rect, visual_rect)
+        self._update_scale(scale)
 
     def data(self, model_index, model_role):
         '''implement QAbstractListModel data() '''
@@ -139,10 +151,10 @@ class PdfModel(QAbstractListModel):
         return self.createIndex(row, column)
 
     def page_origin_width(self):
-        return self._document.page_cropbox(0).width
+        return int(self._document.page_cropbox(0).width)
 
     def page_origin_height(self):
-        return self._document.page_cropbox(0).height
+        return int(self._document.page_cropbox(0).height)
 
     def item_height(self):
         return int(self._scale * self.page_origin_height())
@@ -175,8 +187,8 @@ class PdfViewer(QListView):
         # setting scrollbar
         self.horizontalScrollBar().setSingleStep(30)
         self.verticalScrollBar().setSingleStep(30)
-        # FIXME:
-        # when horizontal bar set to ScrollBarAlwaysOff cause horizontal scroll not working
+        self.horizontalScrollBar().setStyleSheet("QScrollBar {height:0px;}")
+        self.verticalScrollBar().setStyleSheet("QScrollBar {width:0px;}")
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
@@ -259,6 +271,11 @@ class PdfViewer(QListView):
     @interactive
     def zoom_out(self):
         self.model().scale.emit(-0.5)
+
+    @interactive
+    def toggle_read_mode(self):
+        self._setting.toggle_read_mode()
+        self.model().read_mode.emit(self.rect())
 
 class PdfViewerWidget(QWidget):
     def __init__(self, url, color, buffer_id, setting, synctex_info):

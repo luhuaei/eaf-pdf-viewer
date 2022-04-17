@@ -71,6 +71,7 @@ class Setting():
             "enable_progress": "eaf-pdf-show-progress-on-page"
         }
         self.inverted_mode = get_app_dark_mode("eaf-pdf-dark-mode")
+        self.read_mode = "fit_to_customize"
 
     def __getitem__(self, attr):
         var = self.setting_map[attr]
@@ -85,6 +86,22 @@ class Setting():
 
     def toggle_inverted_mode(self):
         self.inverted_mode = not self.inverted_mode
+
+    def toggle_read_mode(self):
+        if self.read_mode == "fit_to_customize":
+            self.read_mode = "fit_to_width"
+        elif self.read_mode == "fit_to_width":
+            self.read_mode = "fit_to_height"
+        elif self.read_mode == "fit_to_height":
+            self.read_mode = "fit_to_width"
+        return self.read_mode
+
+    def get_read_mode_scale(self, page_rect, visual_rect) -> float:
+        if self.read_mode == "fit_to_width":
+            return visual_rect.width() / page_rect.width()
+        elif self.read_mode == "fit_to_height":
+            return visual_rect.height() / page_rect.height()
+        return 0.0
 
 class Emacs():
     def __init__(self):
