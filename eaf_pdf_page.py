@@ -177,26 +177,26 @@ class PdfPage(fitz.Page):
             self.page_width = self.page.CropBox.width
             self.page_height = self.page.CropBox.height
 
-    def get_qpixmap(self, scale, invert, invert_image=False):
+    def get_qpixmap(self, matrix, invert, invert_image=False):
         if self.isPDF:
             set_page_crop_box(self.page)(self.clip)
-        pixmap = get_page_pixmap(self.page)(matrix=fitz.Matrix(scale, scale), alpha=True)
+        pixmap = get_page_pixmap(self.page)(matrix=matrix, alpha=True)
 
         if invert:
             pixmap_invert_irect(pixmap)(pixmap.irect)
 
         if not invert_image and invert:
-            pixmap = self.with_invert_exclude_image(scale, pixmap)
+            pixmap = self.with_invert_exclude_image(matrix, pixmap)
 
         img = QImage(pixmap.samples_mv, pixmap.width, pixmap.height, pixmap.stride, QImage.Format.Format_RGBA8888)
         qpixmap = QPixmap.fromImage(img)
 
         if self.has_annot:
-            qpixmap = self.draw_annots(qpixmap, scale)
+            qpixmap = self.draw_annots(qpixmap, matrix)
 
         return qpixmap
 
-    def draw_annots(self, pixmap, scale):
+    def draw_annots(self, pixmap, matrix):
         if self.hovered_annot is None:
             return pixmap
 
@@ -212,7 +212,7 @@ class PdfPage(fitz.Page):
         if vertices is not None and len(vertices) % 4 == 0:
             for i in range(0, len(vertices), 4):
                 # top-left and bottom-right point
-                rect = fitz.Rect(vertices[i], vertices[i+3]) * scale
+                rect = fitz.Rect(vertices[i], vertices[i+3]) * matrix
                 qrect = QRectF(rect.x0, rect.y0, rect.width, rect.height)
                 qp.fillRect(qrect, color)
         else:
@@ -244,7 +244,7 @@ class PdfPage(fitz.Page):
 
         return None, False
 
-    def with_invert_exclude_image(self, scale, pixmap):
+    def with_invert_exclude_image(self, matrix, pixmap):
         # steps:
         # First, make page all content is invert, include image and text.
         # if exclude image is True, will find the page all image, then get
@@ -270,7 +270,7 @@ class PdfPage(fitz.Page):
                 pass
 
         for bbox in imagebboxlist:
-            pixmap_invert_irect(pixmap)(bbox * self.page.rotationMatrix * scale)
+            pixmap_invert_irect(pixmap)(bbox * matrix)
 
         return pixmap
 

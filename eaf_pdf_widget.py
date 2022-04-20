@@ -32,7 +32,7 @@ import math
 import threading
 
 from eaf_pdf_document import PdfDocument
-from eaf_pdf_utils import inverted_color, support_hit_max
+from eaf_pdf_utils import inverted_color, support_hit_max, transform_to_fmatrix
 from eaf_pdf_annot import AnnotAction
 from eaf_pdf_setting import Emacs
 from delegate.progress import Progress
@@ -68,6 +68,7 @@ class PdfModel(QAbstractListModel):
     device_pixel_ratio = pyqtSignal(float)
     read_mode = pyqtSignal(QRect)
     reload = pyqtSignal()
+    rotate = pyqtSignal(int)
 
     def __init__(self, url, color, buffer_id, setting, synctex_info):
         super().__init__()
@@ -78,6 +79,9 @@ class PdfModel(QAbstractListModel):
 
         self._scale = 1.0
         self.scale.connect(self.update_scale_by_step)
+
+        self._rotate = 0
+        self.rotate.connect(self.update_rotate)
 
         self._device_pixel_ratio = 1.0
         self.device_pixel_ratio.connect(self.update_device_pixel_ratio)
@@ -111,19 +115,32 @@ class PdfModel(QAbstractListModel):
     def reload_document(self):
         self._document = PdfDocument(fitz.open(self._url))
 
+    def update_rotate(self, angle):
+        rotate = (self._rotate + angle) % 360
+        if self._rotate != rotate:
+            self._rotate = rotate
+            self.layoutChanged.emit()
+
     def data(self, model_index, model_role):
         '''implement QAbstractListModel data() '''
         if not model_index.isValid():
             return QVariant()
 
         if model_role == Qt.ItemDataRole.DecorationRole:
-            scale = self._device_pixel_ratio * self._scale
-            qpixmap = self._document[model_index.row()].get_qpixmap(scale, False)
+            scale = self._scale * self._device_pixel_ratio
+            matrix = transform_to_fmatrix(QTransform().scale(scale, scale).rotate(self._rotate))
+            qpixmap = self._document[model_index.row()].get_qpixmap(matrix, False)
             return qpixmap
+
         elif model_role == Qt.ItemDataRole.SizeHintRole:
-            return QSize(self.item_width(), self.item_height())
+            size = QSize(self.item_width(), self.item_height())
+            if self._rotate % 180 != 0:
+                size = size.transposed()
+            return size
+
         elif model_role == Qt.ItemDataRole.UserRole:
             return Pixmap(self._color, self._setting)
+
         elif model_role == Qt.ItemDataRole.UserRole+1:
             return Progress()
 
@@ -315,11 +332,11 @@ class PdfViewer(QListView):
 
     @interactive
     def rotate_clockwise(self):
-        pass
+        self.model().rotate.emit(90)
 
     @interactive
     def rotate_counterclockwise(self):
-        pass
+        self.model().rotate.emit(-90)
 
 class PdfViewerWidget(QWidget):
     def __init__(self, url, color, buffer_id, setting, synctex_info):

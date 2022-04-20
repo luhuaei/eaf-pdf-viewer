@@ -54,5 +54,8 @@ def is_old_version(v, v_bound='1.18.2'):
 
 
 import fitz
-
 support_hit_max = is_old_version(fitz.VersionBind)
+
+# QTransform to fitz matrix
+def transform_to_fmatrix(t):
+    return fitz.Matrix(t.m11(), t.m12(), t.m21(), t.m22(), t.m31(), t.m32())
