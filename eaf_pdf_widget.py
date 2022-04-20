@@ -35,6 +35,8 @@ from eaf_pdf_document import PdfDocument
 from eaf_pdf_utils import inverted_color, support_hit_max
 from eaf_pdf_annot import AnnotAction
 from eaf_pdf_setting import Emacs
+from delegate.progress import Progress
+from delegate.pixmap import Pixmap
 
 def set_page_crop_box(page):
     if hasattr(page, "set_cropbox"):
@@ -48,45 +50,14 @@ class PdfDelegate(QAbstractItemDelegate):
         self._setting = setting
         self._color = color
 
-    def brush_pen_color(self):
-        # Draw background.
-        # change color of background if inverted mode is enable
-        if self._setting.follow_emacs_theme:
-            color = self._color["theme_background"]
-        elif self._setting.inverted_mode:
-            color = self._color["default_background"]
-        else:
-            color = self._color["default_inverted_background"]
-
-        return color
-
     def paint(self, painter, option, model_index):
         option.displayAlignment = Qt.AlignmentFlag.AlignHCenter
 
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceAtop)
-        painter.save()
+        pixmap_layer = model_index.data(Qt.ItemDataRole.UserRole)
+        pixmap_layer.paint(painter, option, model_index)
 
-        color = self.brush_pen_color()
-        painter.setBrush(color)
-        painter.setPen(color)
-
-        qpixmap = model_index.data(Qt.ItemDataRole.DecorationRole)
-
-        # the page qpixmap rect
-        # FIXME:
-        # make qpixmap horizontal center when qpixmap overflow visual rect
-        rect = QRect(option.rect.x(), option.rect.y(), qpixmap.size().width(), qpixmap.size().height())
-
-        # move the qpixmap rect to visual rect center
-        rect.moveCenter(option.rect.center())
-
-        # draw qpixmap rect background color
-        painter.drawRect(rect)
-
-        # draw page qpixmap contents
-        painter.drawPixmap(rect, qpixmap)
-        painter.restore()
+        progress_layer = model_index.data(Qt.ItemDataRole.UserRole+1)
+        progress_layer.paint(painter, option, model_index)
 
     def sizeHint(self, option, model_index):
         return model_index.data(Qt.ItemDataRole.SizeHintRole)
@@ -151,6 +122,10 @@ class PdfModel(QAbstractListModel):
             return qpixmap
         elif model_role == Qt.ItemDataRole.SizeHintRole:
             return QSize(self.item_width(), self.item_height())
+        elif model_role == Qt.ItemDataRole.UserRole:
+            return Pixmap(self._color, self._setting)
+        elif model_role == Qt.ItemDataRole.UserRole+1:
+            return Progress()
 
         return QVariant()
 
