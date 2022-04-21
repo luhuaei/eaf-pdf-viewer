@@ -177,15 +177,17 @@ class PdfPage(fitz.Page):
             self.page_width = self.page.CropBox.width
             self.page_height = self.page.CropBox.height
 
-    def get_qpixmap(self, matrix, invert, invert_image=False):
+    def get_qpixmap(self, matrix, invert, exclude_image=True):
         if self.isPDF:
             set_page_crop_box(self.page)(self.clip)
         pixmap = get_page_pixmap(self.page)(matrix=matrix, alpha=True)
 
         if invert:
+            # will invert all contents(include images)
             pixmap_invert_irect(pixmap)(pixmap.irect)
 
-        if not invert_image and invert:
+        # if exclude image, need to re-invert images to normal color
+        if exclude_image and invert:
             pixmap = self.with_invert_exclude_image(matrix, pixmap)
 
         img = QImage(pixmap.samples_mv, pixmap.width, pixmap.height, pixmap.stride, QImage.Format.Format_RGBA8888)

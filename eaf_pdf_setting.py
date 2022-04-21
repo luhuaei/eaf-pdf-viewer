@@ -71,6 +71,7 @@ class Setting():
             "enable_progress": "eaf-pdf-show-progress-on-page"
         }
         self.inverted_mode = get_app_dark_mode("eaf-pdf-dark-mode")
+        self.inverted_exclude_image = self.__getitem__("dark_exclude_image")
         self.read_mode = "fit_to_customize"
 
     def __getitem__(self, attr):
@@ -86,6 +87,9 @@ class Setting():
 
     def toggle_inverted_mode(self):
         self.inverted_mode = not self.inverted_mode
+
+    def toggle_inverted_exclude_image(self):
+        self.inverted_exclude_image = not self.inverted_exclude_image
 
     def toggle_read_mode(self):
         if self.read_mode == "fit_to_customize":

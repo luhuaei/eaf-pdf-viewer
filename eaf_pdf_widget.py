@@ -129,7 +129,8 @@ class PdfModel(QAbstractListModel):
         if model_role == Qt.ItemDataRole.DecorationRole:
             scale = self._scale * self._device_pixel_ratio
             matrix = transform_to_fmatrix(QTransform().scale(scale, scale).rotate(self._rotate))
-            qpixmap = self._document[model_index.row()].get_qpixmap(matrix, False)
+            qpixmap = self._document[model_index.row()].get_qpixmap(matrix, self._setting.inverted_mode, \
+                                                                    self._setting.inverted_exclude_image)
             return qpixmap
 
         elif model_role == Qt.ItemDataRole.SizeHintRole:
@@ -337,6 +338,17 @@ class PdfViewer(QListView):
     @interactive
     def rotate_counterclockwise(self):
         self.model().rotate.emit(-90)
+
+    @interactive
+    def toggle_inverted_mode(self):
+        self._setting.toggle_inverted_mode()
+        self.update()
+
+    @interactive
+    def toggle_inverted_image_mode(self):
+        self._setting.toggle_inverted_exclude_image()
+        self.update()
+
 
 class PdfViewerWidget(QWidget):
     def __init__(self, url, color, buffer_id, setting, synctex_info):
