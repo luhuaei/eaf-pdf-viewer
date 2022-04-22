@@ -2,30 +2,19 @@ from PyQt6.QtCore import Qt, QRect
 from PyQt6.QtGui import QPainter
 
 class Pixmap():
-    def __init__(self, color, setting):
-        self._color = color
-        self._setting = setting
-
-    def brush_pen_color(self):
-        # Draw background.
-        # change color of background if inverted mode is enable
-        if self._setting.follow_emacs_theme:
-            color = self._color["theme_background"]
-        elif self._setting.inverted_mode:
-            color = self._color["default_background"]
-        else:
-            color = self._color["default_inverted_background"]
-
-        return color
+    def __init__(self):
+        pass
 
     def paint(self, painter, option, model_index):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceAtop)
         painter.save()
 
-        color = self.brush_pen_color()
-        painter.setBrush(color)
-        painter.setPen(color)
+        brush = model_index.data(Qt.ItemDataRole.BackgroundRole)
+        painter.setBrush(brush)
+
+        # set pen color with brush color avoid page border
+        painter.setPen(brush.color())
 
         qpixmap = model_index.data(Qt.ItemDataRole.DecorationRole)
 

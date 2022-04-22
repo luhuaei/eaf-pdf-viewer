@@ -21,7 +21,7 @@
 
 from PyQt6.QtCore import (Qt, QRect, QRectF, QPoint, QEvent, QTimer, pyqtSignal, QAbstractListModel,
                           QVariant, QModelIndex, QSize)
-from PyQt6.QtGui import (QFont, QCursor, QPainter, QPalette, QResizeEvent, QTransform)
+from PyQt6.QtGui import (QFont, QCursor, QPainter, QPalette, QResizeEvent, QTransform, QBrush)
 from PyQt6.QtWidgets import (QWidget, QListView, QAbstractItemView, QAbstractItemDelegate, QStyledItemDelegate)
 from core.utils import (interactive, message_to_emacs,
                         atomic_edit, get_emacs_var, get_emacs_vars,
@@ -139,8 +139,11 @@ class PdfModel(QAbstractListModel):
                 size = size.transposed()
             return size
 
+        elif model_role == Qt.ItemDataRole.BackgroundRole:
+            return self.brush()
+
         elif model_role == Qt.ItemDataRole.UserRole:
-            return Pixmap(self._color, self._setting)
+            return Pixmap()
 
         elif model_role == Qt.ItemDataRole.UserRole+1:
             return Progress()
@@ -159,6 +162,18 @@ class PdfModel(QAbstractListModel):
             return QModelIndex()
 
         return self.createIndex(row, column)
+
+    def brush(self):
+        # Draw background.
+        # change color of background if inverted mode is enable
+        if self._setting.follow_emacs_theme():
+            color = self._color["theme_background"]
+        elif self._setting.inverted_mode:
+            color = self._color["default_background"]
+        else:
+            color = self._color["default_inverted_background"]
+
+        return QBrush(color)
 
     def page_origin_width(self):
         return int(self._document.page_cropbox(0).width)
